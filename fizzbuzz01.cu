@@ -27,13 +27,13 @@ int main() {
     for (int i=0;i<COUNT;++i) {
 	switch(h_fizzbuzz[i]) {
 	    case FIZZBUZZ:
-		puts("FIZZBUZZ");
+		puts("FizzBuzz");
 		break;
 	    case FIZZ:
-		puts("FIZZ");
+		puts("Fizz");
 		break;
 	    case BUZZ:
-		puts("BUZZ");
+		puts("Buzz");
 		break;
 	    case NONE:
 		printf("%d\n", i+1);
