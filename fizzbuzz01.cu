@@ -9,7 +9,7 @@ __device__ FizzBuzzEnum to_enum(int num) {
     return (num%15)==0 ? FIZZBUZZ : (num%3)==0 ? FIZZ : (num%5)==0 ? BUZZ : NONE;
 }
 __global__ void dev_fizzbuzz(FizzBuzzEnum *d_fizzbuzz) {
-    int num = blockIdx.x + 1;
+    int num = threadIdx.x + 1;
     d_fizzbuzz[num] = to_enum(num);
 }
 
