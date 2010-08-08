@@ -19,7 +19,7 @@ int main() {
 
     cudaMalloc(&d_fizzbuzz, sizeof(h_fizzbuzz));
 
-    dev_fizzbuzz<<<COUNT,1>>>(d_fizzbuzz);
+    dev_fizzbuzz<<<1,COUNT>>>(d_fizzbuzz);
 
     cudaMemcpy(h_fizzbuzz, d_fizzbuzz, sizeof(h_fizzbuzz), cudaMemcpyDeviceToHost);
 
