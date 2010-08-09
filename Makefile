@@ -21,7 +21,7 @@ fizzbuzz02: fizzbuzz02.cu
 	nvcc -o $@ $(INCLUDES) $(LDFLAGS) $^
 
 smallpt_cpu: smallpt_cpu.cpp
-	$(CXX) -o $@ -fopenmp $^
+	$(CXX) -o $@ -O3 -fopenmp $^
 
 cuda001: cuda001.cu
 	nvcc -o $@ -lcutil $(INCLUDES) $(LDFLAGS) $^
