@@ -2,7 +2,7 @@ SDK= $(CUDA_SDK)
 INCLUDES+= -I$(SDK)/C/common/inc
 LDFLAGS+=-L$(SDK)/C/lib -L$(SDK)/C/common/lib
 
-TARGETS= hello hello_cuda fizzbuzz01 cuda001 cuda002 smallpt_cpu
+TARGETS= hello hello_cuda fizzbuzz01 fizzbuzz02 cuda001 cuda002 smallpt_cpu
 
 all: $(TARGETS)
 clean:
@@ -17,8 +17,11 @@ hello_cuda: hello_cuda.cu
 fizzbuzz01: fizzbuzz01.cu
 	nvcc -o $@ $(INCLUDES) $(LDFLAGS) $^
 
+fizzbuzz02: fizzbuzz02.cu
+	nvcc -o $@ $(INCLUDES) $(LDFLAGS) $^
+
 smallpt_cpu: smallpt_cpu.cpp
-	g++ -o $@ -fopenmp $^
+	$(CXX) -o $@ -fopenmp $^
 
 cuda001: cuda001.cu
 	nvcc -o $@ -lcutil $(INCLUDES) $(LDFLAGS) $^
