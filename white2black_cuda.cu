@@ -1,20 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-
-#define CORE_NUM (32)
 
 #define WIDTH  (256)
 #define HEIGHT (256)
-
-#define SIZE (WIDTH*HEIGHT)
 
 #define SCALE (1.0)
 #define ENDIAN (-1)
 
 __global__ void white2black(float *ppmbuf) {
     int index = blockIdx.x*blockDim.x + threadIdx.x;
-    __syncthreads();
     float gray = (threadIdx.x / (float)WIDTH);
     ppmbuf[index] = gray;
 }
