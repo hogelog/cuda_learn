@@ -9,44 +9,24 @@
 #define NSUBSAMPLES  2
 #define NAO_SAMPLES  8
 
-typedef struct _vec
-{
-    double x;
-    double y;
-    double z;
-} vec;
-
-
-typedef struct _Isect
-{
+struct vec {
+    double x, y, z;
+};
+struct Isect {
     double t;
-    vec    p;
-    vec    n;
-    int    hit; 
-} Isect;
-
-typedef struct _Sphere
-{
-    vec    center;
+    vec p, n;
+    int hit; 
+};
+struct Sphere {
+    vec center;
     double radius;
-
-} Sphere;
-
-typedef struct _Plane
-{
-    vec    p;
-    vec    n;
-
-} Plane;
-
-typedef struct _Ray
-{
-    vec    org;
-    vec    dir;
-} Ray;
-
-Sphere spheres[3];
-Plane  plane;
+};
+struct Plane {
+    vec p, n;
+};
+struct Ray {
+    vec org, dir;
+};
 
 static double vdot(vec v0, vec v1)
 {
@@ -55,7 +35,6 @@ static double vdot(vec v0, vec v1)
 
 static void vcross(vec *c, vec v0, vec v1)
 {
-    
     c->x = v0.y * v1.z - v0.z * v1.y;
     c->y = v0.z * v1.x - v0.x * v1.z;
     c->z = v0.x * v1.y - v0.y * v1.x;
@@ -75,12 +54,10 @@ static void vnormalize(vec *c)
 void
 ray_sphere_intersect(Isect *isect, const Ray *ray, const Sphere *sphere)
 {
-    vec rs;
-
-    rs.x = ray->org.x - sphere->center.x;
-    rs.y = ray->org.y - sphere->center.y;
-    rs.z = ray->org.z - sphere->center.z;
-
+    vec rs = {
+        ray->org.x - sphere->center.x,
+        ray->org.y - sphere->center.y,
+        ray->org.z - sphere->center.z};
     double B = vdot(rs, ray->dir);
     double C = vdot(rs, rs) - sphere->radius * sphere->radius;
     double D = B * B - C;
@@ -151,26 +128,24 @@ orthoBasis(vec *basis, vec n)
 }
 
 
-void ambient_occlusion(vec *col, const Isect *isect)
+void ambient_occlusion(vec *col, const Isect *isect, Sphere *spheres, Plane plane)
 {
-    int    i, j;
     int    ntheta = NAO_SAMPLES;
     int    nphi   = NAO_SAMPLES;
     double eps = 0.0001;
 
-    vec p;
-
-    p.x = isect->p.x + eps * isect->n.x;
-    p.y = isect->p.y + eps * isect->n.y;
-    p.z = isect->p.z + eps * isect->n.z;
+    vec p = {
+        isect->p.x + eps * isect->n.x,
+        isect->p.y + eps * isect->n.y,
+        isect->p.z + eps * isect->n.z};
 
     vec basis[3];
     orthoBasis(basis, isect->n);
 
     double occlusion = 0.0;
 
-    for (j = 0; j < ntheta; j++) {
-        for (i = 0; i < nphi; i++) {
+    for (int j = 0; j < ntheta; j++) {
+        for (int i = 0; i < nphi; i++) {
             double theta = sqrt(drand48());
             double phi   = 2.0 * M_PI * drand48();
 
@@ -183,16 +158,8 @@ void ambient_occlusion(vec *col, const Isect *isect)
             double ry = x * basis[0].y + y * basis[1].y + z * basis[2].y;
             double rz = x * basis[0].z + y * basis[1].z + z * basis[2].z;
 
-            Ray ray;
-
-            ray.org = p;
-            ray.dir.x = rx;
-            ray.dir.y = ry;
-            ray.dir.z = rz;
-
-            Isect occIsect;
-            occIsect.t   = 1.0e+17;
-            occIsect.hit = 0;
+            Ray ray = {p, {rx, ry, rz}};
+            Isect occIsect = {1.0e+17, {0,0,0}, {0,0,0}, 0};
 
             ray_sphere_intersect(&occIsect, &ray, &spheres[0]); 
             ray_sphere_intersect(&occIsect, &ray, &spheres[1]); 
@@ -200,7 +167,6 @@ void ambient_occlusion(vec *col, const Isect *isect)
             ray_plane_intersect (&occIsect, &ray, &plane); 
 
             if (occIsect.hit) occlusion += 1.0;
-            
         }
     }
 
@@ -224,36 +190,25 @@ clamp(double f)
 
 
 void
-render(unsigned char *img, int w, int h, int nsubsamples)
+render(unsigned char *img, double* fimg, int w, int h, int nsubsamples, Sphere *spheres, Plane plane)
 {
     int x, y;
     int u, v;
 
-    double *fimg = (double *)malloc(sizeof(double) * w * h * 3);
-    memset((void *)fimg, 0, sizeof(double) * w * h * 3);
-
     for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
-            
             for (v = 0; v < nsubsamples; v++) {
                 for (u = 0; u < nsubsamples; u++) {
                     double px = (x + (u / (double)nsubsamples) - (w / 2.0)) / (w / 2.0);
                     double py = -(y + (v / (double)nsubsamples) - (h / 2.0)) / (h / 2.0);
 
-                    Ray ray;
+                    Ray ray = {
+                        {0.0, 0.0, 0.0},
+                        {px, py, -1.0}};
 
-                    ray.org.x = 0.0;
-                    ray.org.y = 0.0;
-                    ray.org.z = 0.0;
-
-                    ray.dir.x = px;
-                    ray.dir.y = py;
-                    ray.dir.z = -1.0;
                     vnormalize(&(ray.dir));
 
-                    Isect isect;
-                    isect.t   = 1.0e+17;
-                    isect.hit = 0;
+                    Isect isect = {1.0e+17, {0,0,0}, {0,0,0}, 0};
 
                     ray_sphere_intersect(&isect, &ray, &spheres[0]);
                     ray_sphere_intersect(&isect, &ray, &spheres[1]);
@@ -262,7 +217,7 @@ render(unsigned char *img, int w, int h, int nsubsamples)
 
                     if (isect.hit) {
                         vec col;
-                        ambient_occlusion(&col, &isect);
+                        ambient_occlusion(&col, &isect, spheres, plane);
 
                         fimg[3 * (y * w + x) + 0] += col.x;
                         fimg[3 * (y * w + x) + 1] += col.y;
@@ -275,49 +230,17 @@ render(unsigned char *img, int w, int h, int nsubsamples)
             fimg[3 * (y * w + x) + 0] /= (double)(nsubsamples * nsubsamples);
             fimg[3 * (y * w + x) + 1] /= (double)(nsubsamples * nsubsamples);
             fimg[3 * (y * w + x) + 2] /= (double)(nsubsamples * nsubsamples);
-        
             img[3 * (y * w + x) + 0] = clamp(fimg[3 *(y * w + x) + 0]);
             img[3 * (y * w + x) + 1] = clamp(fimg[3 *(y * w + x) + 1]);
             img[3 * (y * w + x) + 2] = clamp(fimg[3 *(y * w + x) + 2]);
         }
     }
-
-}
-
-void
-init_scene()
-{
-    spheres[0].center.x = -2.0;
-    spheres[0].center.y =  0.0;
-    spheres[0].center.z = -3.5;
-    spheres[0].radius = 0.5;
-    
-    spheres[1].center.x = -0.5;
-    spheres[1].center.y =  0.0;
-    spheres[1].center.z = -3.0;
-    spheres[1].radius = 0.5;
-    
-    spheres[2].center.x =  1.0;
-    spheres[2].center.y =  0.0;
-    spheres[2].center.z = -2.2;
-    spheres[2].radius = 0.5;
-
-    plane.p.x = 0.0;
-    plane.p.y = -0.5;
-    plane.p.z = 0.0;
-
-    plane.n.x = 0.0;
-    plane.n.y = 1.0;
-    plane.n.z = 0.0;
-
 }
 
 void
 saveppm(const char *fname, int w, int h, unsigned char *img)
 {
-    FILE *fp;
-
-    fp = fopen(fname, "wb");
+    FILE *fp = fopen(fname, "wb");
     assert(fp);
 
     fprintf(fp, "P6\n");
@@ -330,11 +253,17 @@ saveppm(const char *fname, int w, int h, unsigned char *img)
 int
 main(int argc, char **argv)
 {
+    Sphere spheres[3] = {
+        {-2.0, 0.0, -3.5, 0.5},
+        {-0.5, 0.0, -3.0, 0.5},
+        {1.0, 0.0, -2.2, 0.5}};
+    Plane plane = {
+        {0.0, -0.5, 0.0},
+        {0.0, 1.0, 0.0}};
     unsigned char *img = (unsigned char *)malloc(WIDTH * HEIGHT * 3);
+    double *fimg = (double *)malloc(sizeof(double) * WIDTH * HEIGHT * 3);
 
-    init_scene();
-
-    render(img, WIDTH, HEIGHT, NSUBSAMPLES);
+    render(img, fimg, WIDTH, HEIGHT, NSUBSAMPLES, spheres, plane);
 
     saveppm("ao.ppm", WIDTH, HEIGHT, img); 
 
