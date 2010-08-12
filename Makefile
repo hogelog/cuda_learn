@@ -5,9 +5,9 @@ TOP= /usr/local/cuda
 SDK= $(CUDA_SDK)
 
 INC=
-CFLAGS+=-g -O3 -Wall
-CXXFLAGS+=-g -O3 -Wall
-NVCCFLAGS+=-g -G -O3
+CFLAGS+=-O3 -Wall
+CXXFLAGS+=-O3 -Wall
+NVCCFLAGS+=-O3
 
 INC_CUBLAS= -I$(TOP)/include
 LD_CUBLAS= -lcublas -L$(TOP)/lib
@@ -15,7 +15,7 @@ LD_CUBLAS= -lcublas -L$(TOP)/lib
 INC_CUTIL= -I$(SDK)/C/common/inc
 LD_CUTIL=-lcutil_i386 -L$(SDK)/C/lib -L$(SDK)/C/common/lib
 
-TARGETS= hello hello_cuda fizzbuzz01 fizzbuzz02 white2black white2black_cuda cuda001 cuda002 smallpt_cpu ao ao_cuda
+TARGETS= hello hello_cuda fizzbuzz01 fizzbuzz02 white2black white2black_cuda smallpt_cpu ao ao_cuda ao_cuda_opt
 
 all: $(TARGETS)
 clean:
@@ -44,6 +44,9 @@ ao: ao.c
 
 ao_cuda: ao_cuda.cu
 	nvcc -o $@ $(INC_CUTIL) $(NVCCFLAGS) $(INC) $(LDFLAGS) $^
+
+ao_cuda_opt: ao_cuda_opt.cu
+	nvcc -o $@ -use_fast_math $(INC_CUTIL) $(NVCCFLAGS) $(INC) $(LDFLAGS) $^
 
 smallpt_cpu: smallpt_cpu.cpp
 	$(CXX) -o $@ $(CXXFLAGS) -fopenmp $^
