@@ -8,10 +8,12 @@
 
 #include <thrust/random.h>
 
-#define WIDTH        256
-#define HEIGHT       256
-#define NSUBSAMPLES  2
-#define NAO_SAMPLES  8
+__constant__ const float PI = 3.141592653589793f;
+
+#define WIDTH  256
+#define HEIGHT 256
+#define NSUBSAMPLES = 2;
+#define NAO_SAMPLES = 8;
 
 #define RASTER_SIZE (sizeof(float)*WIDTH*HEIGHT*1)
 
@@ -170,10 +172,10 @@ ambient_occlusion(vec& col, const Isect& isect, RNG& rng, RNG_range& rng_range)
 
     float occlusion = 0.0f;
 
-    for (int j = 0; j < NAO_SAMPLES; j++) {
-        for (int i = 0; i < NAO_SAMPLES; i++) {
+    for (int j = 0; j < NAO_SAMPLES; ++j) {
+        for (int i = 0; i < NAO_SAMPLES; ++i) {
             const float theta = sqrtf(rng_range(rng));
-            const float phi   = 2.0f * (float)M_PI * rng_range(rng);
+            const float phi   = 2.0f * PI * rng_range(rng);
 
             const float x = cosf(phi) * theta;
             const float y = sinf(phi) * theta;
@@ -229,8 +231,8 @@ dev_render(float *img)
     RNG_range rng_range(0, 1);
 
     float pixel = 0.0f;
-    for (int v = 0; v < NSUBSAMPLES; v++) {
-        for (int u = 0; u < NSUBSAMPLES; u++) {
+    for (int v = 0; v < NSUBSAMPLES; ++v) {
+        for (int u = 0; u < NSUBSAMPLES; ++u) {
             __syncthreads();
             const float px = (x + (u / (float)NSUBSAMPLES) - (WIDTH / 2.0f)) / (WIDTH / 2.0f);
             const float py = -(y + (v / (float)NSUBSAMPLES) - (HEIGHT / 2.0f)) / (HEIGHT / 2.0f);
@@ -270,8 +272,10 @@ render(float *img)
     float *d_img = NULL;
     cutilSafeCall(cudaMalloc(&d_img, RASTER_SIZE));
 
-    dev_render<<<NBLOCKS, NTHREADS>>>(d_img);
-    cutilCheckMsg("dev_render() execution failed");
+    for (int i = 0; i < 64; ++i) {
+        dev_render<<<NBLOCKS, NTHREADS>>>(d_img);
+        cutilCheckMsg("dev_render() execution failed");
+    }
 
     cutilSafeCall(cudaMemcpy(img, d_img, RASTER_SIZE, cudaMemcpyDeviceToHost));
     cutilSafeCall(cudaFree(d_img));
