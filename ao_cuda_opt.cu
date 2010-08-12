@@ -13,10 +13,12 @@
 #define NSUBSAMPLES  2
 #define NAO_SAMPLES  8
 
-#define RASTER_SIZE (sizeof(float)*WIDTH*HEIGHT*3)
+#define RASTER_SIZE (sizeof(float)*WIDTH*HEIGHT*1)
+
+#define NSIZE (WIDTH*HEIGHT)
 
 #define NTHREADS 64
-#define NBLOCKS (WIDTH*HEIGHT/NTHREADS)
+#define NBLOCKS (NSIZE/NTHREADS)
 
 typedef thrust::default_random_engine RNG;
 typedef thrust::uniform_real_distribution<float> RNG_range;
@@ -50,26 +52,26 @@ __constant__ Plane plane = {
     {0.0f, -0.5f, 0.0f},
     {0.0f,  1.0f, 0.0f}};
 
-__device__ static float
-vdot(vec v0, vec v1)
+__device__ inline float
+vdot(const vec v0, const vec v1)
 {
     return v0.x * v1.x + v0.y * v1.y + v0.z * v1.z;
 }
 
-__device__ static void
-vcross(vec& c, vec v0, vec v1)
+__device__ inline void
+vcross(vec& c, const vec v0, const vec v1)
 {
     c.x = v0.y * v1.z - v0.z * v1.y;
     c.y = v0.z * v1.x - v0.x * v1.z;
     c.z = v0.x * v1.y - v0.y * v1.x;
 }
 
-__device__ static void
+__device__ inline void
 vnormalize(vec& c)
 {
-    float length = sqrt(vdot(c, c));
+    const float length = sqrt(vdot(c, c));
 
-    if (fabs(length) > 1.0e-17f) {
+    if (fabsf(length) > 1.0e-17f) {
         c.x /= length;
         c.y /= length;
         c.z /= length;
@@ -79,18 +81,17 @@ vnormalize(vec& c)
 __device__ void
 ray_sphere_intersect(Isect& isect, const Ray& ray, const Sphere& sphere)
 {
-    vec rs;
+    const vec rs = {
+        ray.org.x - sphere.center.x,
+        ray.org.y - sphere.center.y,
+        ray.org.z - sphere.center.z};
 
-    rs.x = ray.org.x - sphere.center.x;
-    rs.y = ray.org.y - sphere.center.y;
-    rs.z = ray.org.z - sphere.center.z;
-
-    float B = vdot(rs, ray.dir);
-    float C = vdot(rs, rs) - sphere.radius * sphere.radius;
-    float D = B * B - C;
+    const float B = vdot(rs, ray.dir);
+    const float C = vdot(rs, rs) - sphere.radius * sphere.radius;
+    const float D = B * B - C;
 
     if (D > 0.0f) {
-        float t = -B - sqrt(D);
+        const float t = -B - sqrt(D);
         
         if ((t > 0.0f) && (t < isect.t)) {
             isect.t = t;
@@ -112,12 +113,12 @@ ray_sphere_intersect(Isect& isect, const Ray& ray, const Sphere& sphere)
 __device__ void
 ray_plane_intersect(Isect& isect, const Ray& ray)
 {
-    float d = -vdot(plane.p, plane.n);
-    float v = vdot(ray.dir, plane.n);
+    const float d = -vdot(plane.p, plane.n);
+    const float v = vdot(ray.dir, plane.n);
 
-    if (fabs(v) < 1.0e-17f) return;
+    if (fabsf(v) < 1.0e-17f) return;
 
-    float t = -(vdot(ray.org, plane.n) + d) / v;
+    const float t = -(vdot(ray.org, plane.n) + d) / v;
 
     if ((t > 0.0f) && (t < isect.t)) {
         isect.t = t;
@@ -132,11 +133,8 @@ ray_plane_intersect(Isect& isect, const Ray& ray)
 }
 
 __device__ void
-orthoBasis(vec *basis, vec n)
+orthoBasis(vec basis[3], vec n)
 {
-    basis[2] = n;
-    basis[1].x = 0.0f; basis[1].y = 0.0f; basis[1].z = 0.0f;
-
     if ((n.x < 0.6f) && (n.x > -0.6f)) {
         basis[1].x = 1.0f;
     } else if ((n.y < 0.6f) && (n.y > -0.6f)) {
@@ -155,41 +153,40 @@ orthoBasis(vec *basis, vec n)
 }
 
 __device__ void
-ambient_occlusion(vec *col, const Isect *isect, RNG& rng, RNG_range& rng_range)
+ambient_occlusion(vec& col, const Isect& isect, RNG& rng, RNG_range& rng_range)
 {
     const float eps = 0.0001f;
 
-    vec p;
+    const vec p = {
+        isect.p.x + eps * isect.n.x,
+        isect.p.y + eps * isect.n.y,
+        isect.p.z + eps * isect.n.z};
 
-    p.x = isect->p.x + eps * isect->n.x;
-    p.y = isect->p.y + eps * isect->n.y;
-    p.z = isect->p.z + eps * isect->n.z;
-
-    vec basis[3];
-    orthoBasis(basis, isect->n);
+    vec basis[3] = {
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
+        isect.n};
+    orthoBasis(basis, isect.n);
 
     float occlusion = 0.0f;
 
     for (int j = 0; j < NAO_SAMPLES; j++) {
         for (int i = 0; i < NAO_SAMPLES; i++) {
-            float theta = sqrt(rng_range(rng));
-            float phi   = 2.0f * (float)M_PI * rng_range(rng);
+            const float theta = sqrtf(rng_range(rng));
+            const float phi   = 2.0f * (float)M_PI * rng_range(rng);
 
-            float x = cos(phi) * theta;
-            float y = sin(phi) * theta;
-            float z = sqrt(1.0f - theta * theta);
+            const float x = cosf(phi) * theta;
+            const float y = sinf(phi) * theta;
+            const float z = sqrtf(1.0f - theta * theta);
 
             // local -> global
-            float rx = x * basis[0].x + y * basis[1].x + z * basis[2].x;
-            float ry = x * basis[0].y + y * basis[1].y + z * basis[2].y;
-            float rz = x * basis[0].z + y * basis[1].z + z * basis[2].z;
+            const float rx = x * basis[0].x + y * basis[1].x + z * basis[2].x;
+            const float ry = x * basis[0].y + y * basis[1].y + z * basis[2].y;
+            const float rz = x * basis[0].z + y * basis[1].z + z * basis[2].z;
 
-            Ray ray;
-
-            ray.org = p;
-            ray.dir.x = rx;
-            ray.dir.y = ry;
-            ray.dir.z = rz;
+            const Ray ray = {
+                p,
+                {rx, ry, rz}};
 
             Isect occIsect;
             occIsect.t   = 1.0e+17f;
@@ -206,12 +203,12 @@ ambient_occlusion(vec *col, const Isect *isect, RNG& rng, RNG_range& rng_range)
 
     occlusion = (NAO_SAMPLES * NAO_SAMPLES - occlusion) / (float)(NAO_SAMPLES * NAO_SAMPLES);
 
-    col->x = occlusion;
-    col->y = occlusion;
-    col->z = occlusion;
+    col.x = occlusion;
+    col.y = occlusion;
+    col.z = occlusion;
 }
 
-__device__ float
+__device__ inline float
 clamp(float f) {
     if (f < 0.0f) return 0.0f;
     else if (f > 1.0f) return 1.0f;
@@ -221,9 +218,9 @@ clamp(float f) {
 __global__ void
 dev_render(float *img)
 {
-    int y = blockIdx.x / (NBLOCKS / HEIGHT);
-    int x = threadIdx.x + ((blockIdx.x & (NBLOCKS / HEIGHT - 1)) * NTHREADS);
-    unsigned int seed = y*WIDTH + x;
+    const int y = blockIdx.x / (NBLOCKS / HEIGHT);
+    const int x = threadIdx.x + ((blockIdx.x & (NBLOCKS / HEIGHT - 1)) * NTHREADS);
+    const unsigned int seed = y*WIDTH + x;
 
     // seed a random number generator
     RNG rng(seed);
@@ -231,21 +228,16 @@ dev_render(float *img)
     // create a mapping from random numbers to [0,1)
     RNG_range rng_range(0, 1);
 
-    vec pixel = {0.0f, 0.0f, 0.0f};
+    float pixel = 0.0f;
     for (int v = 0; v < NSUBSAMPLES; v++) {
         for (int u = 0; u < NSUBSAMPLES; u++) {
-            float px = (x + (u / (float)NSUBSAMPLES) - (WIDTH / 2.0f)) / (WIDTH / 2.0f);
-            float py = -(y + (v / (float)NSUBSAMPLES) - (HEIGHT / 2.0f)) / (HEIGHT / 2.0f);
+            __syncthreads();
+            const float px = (x + (u / (float)NSUBSAMPLES) - (WIDTH / 2.0f)) / (WIDTH / 2.0f);
+            const float py = -(y + (v / (float)NSUBSAMPLES) - (HEIGHT / 2.0f)) / (HEIGHT / 2.0f);
 
-            Ray ray;
-
-            ray.org.x = 0.0f;
-            ray.org.y = 0.0f;
-            ray.org.z = 0.0f;
-
-            ray.dir.x = px;
-            ray.dir.y = py;
-            ray.dir.z = -1.0f;
+            Ray ray = {
+                {0.0f, 0.0f, 0.0f},
+                {px, py, -1.0f}};
             vnormalize(ray.dir);
 
             Isect isect;
@@ -259,24 +251,17 @@ dev_render(float *img)
 
             if (isect.hit == 1.0f) {
                 vec col;
-                ambient_occlusion(&col, &isect, rng, rng_range);
+                ambient_occlusion(col, isect, rng, rng_range);
 
-                pixel.x += col.x;
-                pixel.y += col.y;
-                pixel.z += col.z;
+                pixel += (col.x + col.y + col.z) / 3.0f;
             }
         }
     }
-    pixel.x /= (float)(NSUBSAMPLES * NSUBSAMPLES);
-    pixel.y /= (float)(NSUBSAMPLES * NSUBSAMPLES);
-    pixel.z /= (float)(NSUBSAMPLES * NSUBSAMPLES);
+    __syncthreads();
+
     // display(ImageMagic) bug? 
-    //img[3 * (y * WIDTH + x) + 0] = clamp(pixel.x);
-    //img[3 * (y * WIDTH + x) + 1] = clamp(pixel.y);
-    //img[3 * (y * WIDTH + x) + 2] = clamp(pixel.z);
-    img[3 * ((HEIGHT - y) * WIDTH + x) + 0] = clamp(pixel.x);
-    img[3 * ((HEIGHT - y) * WIDTH + x) + 1] = clamp(pixel.y);
-    img[3 * ((HEIGHT - y) * WIDTH + x) + 2] = clamp(pixel.z);
+    //img[y * WIDTH + x] = clamp(pixel / (float)(NSUBSAMPLES * NSUBSAMPLES));
+    img[(HEIGHT - y) * WIDTH + x] = clamp(pixel / (float)(NSUBSAMPLES * NSUBSAMPLES));
 }
 
 void
@@ -300,10 +285,10 @@ saveppm(const char *fname, float *img)
     fp = fopen(fname, "wb");
     assert(fp);
 
-    fprintf(fp, "PF\n");
+    fprintf(fp, "Pf\n");
     fprintf(fp, "%d %d\n", WIDTH, HEIGHT);
     fprintf(fp, "-1.0\n");
-    fwrite(img, RASTER_SIZE, 1, fp);
+    fwrite(img, sizeof(float), RASTER_SIZE, fp);
     fclose(fp);
 }
 
