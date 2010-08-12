@@ -12,8 +12,8 @@ __constant__ const float PI = 3.141592653589793f;
 
 #define WIDTH  256
 #define HEIGHT 256
-#define NSUBSAMPLES = 2;
-#define NAO_SAMPLES = 8;
+#define NSUBSAMPLES 2
+#define NAO_SAMPLES 8
 
 #define RASTER_SIZE (sizeof(float)*WIDTH*HEIGHT*1)
 
